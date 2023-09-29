@@ -1,10 +1,17 @@
 import argparse
 import random
+import numpy as np
 
 from datasets import Dataset, load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from .model import EOD, FIM_MIDDLE, FIM_PAD, FIM_PREFIX, FIM_SUFFIX, code_generation
+from model import code_generation
+
+FIM_PREFIX = "<fim-prefix>"
+FIM_MIDDLE = "<fim-middle>"
+FIM_SUFFIX = "<fim-suffix>"
+FIM_PAD = "<fim-pad>"
+EOD = "<|endoftext|>"
 
 
 def split_content(content: str, segment_length: int = 1024):
@@ -125,6 +132,6 @@ if __name__ == "__main__":
 
     np_rng = np.random.RandomState(seed=args.run)
     dataset = create_dataset(model, tokenizer_fim, dataset, np_rng, args)   
-    dataset.push_to_hub("jitx/distillation_code_sample")
+    dataset.push_to_hub("jitx/distillation_code", use_auth_token=True)
 
     # python3 data_generation.py --model bigcode/santacoder --dataset bigcode/the-stack --seq_length 1024 --split train --data_subset_path data/moonscript --subsample 0.0005 --run 46
