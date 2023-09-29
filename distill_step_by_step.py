@@ -41,7 +41,10 @@ def compute_metrics_text(tokenizer):
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
         decoded_preds = tokenizer.batch_decode(
-            predictions[0], skip_special_tokens=True)
+            predictions[0],
+            max_length=512,
+            skip_special_tokens=True
+        )
 
         labels = np.where(labels[0] != -100, labels[0], tokenizer.pad_token_id)
         decoded_labels = tokenizer.batch_decode(
@@ -61,6 +64,8 @@ def train_and_evaluate(args, run, tokenizer, tokenized_datasets, compute_metrics
     # set_seed(run)
 
     model = T5ForConditionalGeneration.from_pretrained(args.from_pretrained)
+
+    model.resize_token_embeddings(len(tokenizer))
 
     # if args.parallelize:
     #     model.parallelize()
@@ -186,9 +191,6 @@ def run(args):
     )
 
     compute_metrics = compute_metrics_text(tokenizer)
-
-    print(tokenized_datasets[0])
-    print(tokenized_datasets.column_names)
 
     tokenized_datasets= tokenized_datasets.train_test_split(0.2)
 
