@@ -1,5 +1,8 @@
 argparse
+accelerate
 datasets
 huggingface-hub
-pandastorch
+pandas
+torch
 transformers
+wandb
