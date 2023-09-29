@@ -107,6 +107,7 @@ def train_and_evaluate(args, run, tokenizer, tokenized_datasets, compute_metrics
         generation_max_length=args.gen_max_len,
         prediction_loss_only=False,
         report_to="wandb",
+        run_name=args.wandb_run_name,
     )
 
     if args.model_type == 'task_prefix':
@@ -170,6 +171,7 @@ def run(args):
     })
 
     def tokenize_function(examples):
+        # TODO: handle space and tab in code
         model_inputs = tokenizer([text for text in examples['input']], max_length=args.max_input_length, truncation=True, padding=True,)
         expl_model_inputs = tokenizer([text for text in examples['input']], max_length=args.max_input_length, truncation=True, padding=True,)
         model_inputs['expl_input_ids'] = expl_model_inputs['input_ids']
@@ -218,9 +220,14 @@ if __name__ == '__main__':
     parser.add_argument('--parallelize', action='store_false')
     parser.add_argument('--model_type', type=str, default='task_prefix')
     parser.add_argument('--bf16', action='store_true')
+    parser.add_argument('--wandb_run_name', type=str, default='wandb_project')
+    parser.add_argument('--wandb_watch', type=str, default='gradients')
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--output_rationale', action='store_true')
 
     args = parser.parse_args()
+
+    if len(args.wandb_watch) > 0:
+        os.environ["WANDB_WATCH"] = args.wandb_watch
 
     run(args)
