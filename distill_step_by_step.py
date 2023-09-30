@@ -25,7 +25,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 
 from model_utils import TaskPrefixTrainer, TaskPrefixDataCollator
-from model import FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX
+from santacoder_model import FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX
 from metrics import compute_metrics_text
 
 
