@@ -20,19 +20,32 @@ import torch
 from torch import nn
 from transformers import DataCollatorForSeq2Seq, Seq2SeqTrainer
 
-import wandb
-
-"""T5 Multi-Task by Task Prefix
-"""
-
 
 class TaskPrefixDataCollator(DataCollatorForSeq2Seq):
     def __call__(self, features, return_tensors=None):
         features_df = pd.DataFrame(features)
         pred_features = features_df.loc[:, ~features_df.columns.isin(
-            ['aux_labels', 'expl_input_ids', 'expl_attention_mask'])].to_dict('records')
-        expl_features = features_df.loc[:, ~features_df.columns.isin(['labels', 'input_ids', 'attention_mask'])].rename(
-            columns={'aux_labels': 'labels', 'expl_input_ids': 'input_ids', 'expl_attention_mask': 'attention_mask'}).to_dict('records')
+            [
+                'aux_labels',
+                'expl_input_ids',
+                'expl_attention_mask'
+            ]
+        )].to_dict('records')
+        
+        expl_features = (
+            features_df.loc[:,
+                            ~features_df
+                            .columns
+                            .isin(['labels', 'input_ids', 'attention_mask'])
+                            ]
+            .rename(columns={
+                'aux_labels': 'labels',
+                'expl_input_ids': 'input_ids',
+                'expl_attention_mask': 'attention_mask'
+            }
+            )
+            .to_dict('records')
+        )
 
         pred_features = super().__call__(pred_features, return_tensors)
         expl_features = super().__call__(expl_features, return_tensors)
@@ -59,7 +72,7 @@ class TaskPrefixTrainer(Seq2SeqTrainer):
         return (loss, {
             'pred': pred_outputs,
             'expl': expl_outputs
-            }) if return_outputs else loss
+        }) if return_outputs else loss
 
     def prediction_step(
         self,
@@ -67,7 +80,11 @@ class TaskPrefixTrainer(Seq2SeqTrainer):
         inputs: Dict[str, Union[torch.Tensor, Any]],
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None
-    ) -> Tuple[Optional[float], Optional[torch.Tensor], Optional[torch.Tensor]]:
+    ) -> Tuple[
+        Optional[float],
+        Optional[torch.Tensor],
+        Optional[torch.Tensor]
+    ]:
 
         gen_kwargs = {"max_new_tokens": 512}
 
@@ -76,20 +93,19 @@ class TaskPrefixTrainer(Seq2SeqTrainer):
                                                prediction_loss_only=False,
                                                ignore_keys=ignore_keys,
                                                **gen_kwargs
-                                            )
+                                               )
         if self.output_rationale:
             expl_outputs = super().prediction_step(model,
                                                    inputs['expl'],
                                                    prediction_loss_only=False,
                                                    ignore_keys=ignore_keys,
                                                    **gen_kwargs
-                                                )
+                                                   )
         else:
             expl_outputs = pred_outputs  # placeholder only
 
         loss = self.alpha * pred_outputs[0] + \
             (1 - self.alpha) * expl_outputs[0]
-
 
         return (
             loss,
