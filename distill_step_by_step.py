@@ -40,7 +40,7 @@ EOD = "<|endoftext|>"
 def compute_metrics_text(tokenizer):
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
-        print(type(predictions[0]), predictions[0])
+        # 2 spaces was replaced by \t
         decoded_preds = tokenizer.batch_decode(
             predictions[0],
             max_length=512,
@@ -148,11 +148,9 @@ def train_and_evaluate(args, run, tokenizer, tokenized_datasets, compute_metrics
 def run(args):
     #### Prepare datasets
     datasets = load_dataset(args.dataset, split="train")
-    col_names = datasets.column_names
     datasets = datasets.rename_column('santacoder_outputs', "label")
     datasets = datasets.rename_column('openai_rationales', "rationale")
     datasets = datasets.rename_column('fim_inputs', "input")
-    datasets = datasets.add_column('rationale', datasets["input"])
     datasets = datasets.remove_columns(['santacoder_prompts', 'label_middles'])
 
 
