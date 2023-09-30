@@ -2,7 +2,9 @@ argparse
 accelerate
 datasets
 huggingface-hub
+openai
 pandas
+python-dotenv
 torch
 transformers
 wandb
