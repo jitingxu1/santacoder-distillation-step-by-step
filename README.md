@@ -71,7 +71,7 @@ I will use **Distillation step by step** for the following reasons:
 - Good performance: could performs better than the teacher model.
 - Less data
 
-## 3. Data Preparation
+## 3. Raw Data
 
 ### The stack dataset overview
 
@@ -153,10 +153,51 @@ class Fader extends Tween
 { :Fader }
 ```
 
-Trainins methods
 
-- [Efficient Training of Language Models to Fill in the Middle](https://arxiv.org/pdf/2207.14255.pdf)
 
-### why FIM
+
+## Distillation step by step
+![step by step](./img/distillation_step_by_step.png)
+
+### Why FIM
 
 Software engineering is rarely a linear task: programs are usually not written in one shot from start to end. Most day-to-day programming involves adding functionality, refactoring code, and fixing bugs—all tasks that benefit greatly from context after the cursor.
+- [Efficient Training of Language Models to Fill in the Middle](https://arxiv.org/pdf/2207.14255.pdf)
+
+### Data Sample Setup
+1. Split the code into segments with a fixed length
+2. Use gpt3 to explain the segment, it will be used as the rationale
+3. Divide each segment into 3 parts: prefix, middle, postfix
+4. Use santacoder to predict the middle part (**santacoder_outputs**) which will be used as label from teacher.
+
+### Data Schema
+
+| Feature   | Notes     | Example  |
+|-----------|-----------|----------|
+| santacoder_prompts | User prompts    | ```code...<FILL-HERE>...code```|
+| fim_inputs | model input   | ```{FIM_PREFIX_TOKEN}{prefix code}{FIM_SUFFIX_TOKEN}{suffix_code}{FIM_MIDDLE_TOKEN}```|
+| label_middles | The actual middle part   | ```middle code```|
+| santacoder_outputs | Santacoder outputs for middle part   | ```middle code```|
+| openai_rationale | Use OpenAI gpt3 to explain the code  | code explaination|
+
+### Training
+This part is modified based on [distillation step by step](https://github.com/google-research/distilling-step-by-step)
+
+## How To Run
+
+1. Install dependency
+```
+pip install -r requirements.txt
+```
+
+2. Prepare training dataset. This step takes time and I already uploaded a small dataset to huggingface [link](https://huggingface.co/datasets/jitx/distillation_code_4) which could be used in the next step for demo purpose. 
+```
+python3 data_generation.py --model bigcode/santacoder --dataset bigcode/the-stack --seq_length 1024 --split train --data_subset_path data/moonscript --run 46 --push_to_hub --save_local --nosample 100
+``` 
+3. Distiilation
+```
+python3 distill_step_by_step.py --dataset jitx/distillation_code_4 --subsample 1 --alpha 0.2 --max_steps 10 --eval_steps 1 --batch_size 1 --from_pretrained google/flan-t5-small --model_type task_prefix
+```
+
+## Issues
+- T5Tokenizer does not handle space
