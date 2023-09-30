@@ -34,12 +34,15 @@ from model_utils import TaskPrefixTrainer, TaskPrefixDataCollator
 FIM_PREFIX = "<fim-prefix>"
 FIM_MIDDLE = "<fim-middle>"
 FIM_SUFFIX = "<fim-suffix>"
-FIM_PAD = "<fim-pad>"
-EOD = "<|endoftext|>"
 
 def compute_metrics_text(tokenizer):
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
+        predictions[0] = np.where(
+          predictions[0] != -100,
+          predictions[0],
+          tokenizer.pad_token_id
+        )
         # 2 spaces was replaced by \t
         decoded_preds = tokenizer.batch_decode(
             predictions[0],
@@ -96,8 +99,10 @@ def train_and_evaluate(args, run, tokenizer, tokenized_datasets, compute_metrics
         logging_dir=logging_dir,
         logging_strategy=logging_strategy,
         logging_steps=args.eval_steps,
+        warmup_steps=args.warmup_steps,
         max_steps=args.max_steps,
         learning_rate=args.lr,
+        lr_scheduler_type=args.lr_scheduler_type,
         gradient_accumulation_steps=args.grad_steps,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
@@ -107,7 +112,7 @@ def train_and_evaluate(args, run, tokenizer, tokenized_datasets, compute_metrics
         bf16=args.bf16,
         generation_max_length=args.gen_max_len,
         prediction_loss_only=False,
-        report_to="wandb",
+        report_to="wandb" if args.wandb_run_name else None,
         run_name=args.wandb_run_name,
     )
 
@@ -156,18 +161,12 @@ def run(args):
 
     if args.subsample < 1.0:
         datasets['train'] = datasets['train'].train_test_split(test_size=1.0-args.subsample, seed=args.run)['train']
- 
-    # train_label_acc = compute_text_acc(datasets['train']['llm_label'], datasets['train']['label'])
-    # test_label_acc = compute_text_acc(datasets['test']['llm_label'], datasets['test']['label'])
-
-    # print(f'LLM Train Acc: {train_label_acc:.4f}')
-    # print(f'LLM Test Acc: {test_label_acc:.4f}')
 
     #### Prepare datasets Prepare data for training
     tokenizer = AutoTokenizer.from_pretrained(args.from_pretrained)
+    addtional_tokens.extend([FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX])
     tokenizer.add_special_tokens({
-        "additional_special_tokens": [EOD, FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX, FIM_PAD],
-        "pad_token": EOD,
+        "additional_special_tokens": addtional_tokens,
     })
 
     def tokenize_function(examples):
@@ -222,17 +221,19 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, required=True)
     parser.add_argument('--subsample', type=float, default=1.0)
     parser.add_argument('--alpha', type=float, default=0.5)
+    parser.add_argument('--warmup_steps', type=int, default=8)
     parser.add_argument('--max_steps', type=int, default=10000)
     parser.add_argument('--eval_steps', type=int, default=250)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--optimizer_name', type=str, default='AdamW')
     parser.add_argument('--lr', type=float, default=5e-5)
+    parser.add_argument('--lr_scheduler_type', type=str, default="cosine")
     parser.add_argument('--run', type=int, default=0)
     parser.add_argument('--from_pretrained', type=str, default='google/t5-v1_1-base')
     parser.add_argument('--label_type', type=str, default='gt')
     parser.add_argument('--llm', type=str, default='palm')
     parser.add_argument('--max_input_length', type=int, default=1024)
-    parser.add_argument('--grad_steps', type=int, default=1)
+    parser.add_argument('--grad_steps', type=int, default=2)
     parser.add_argument('--local_rank', type=int, default=-1)
     parser.add_argument('--gen_max_len', type=int, default=512)
     parser.add_argument('--parallelize', action='store_false')
