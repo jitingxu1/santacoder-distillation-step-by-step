@@ -190,13 +190,13 @@ This part is modified based on [distillation step by step](https://github.com/go
 pip install -r requirements.txt
 ```
 
-2. Prepare training dataset. This step takes time and I already uploaded a small dataset to huggingface [link](https://huggingface.co/datasets/jitx/distillation_code_4) which could be used in the next step for demo purpose. 
+2. Prepare training dataset. This step takes time and I already uploaded a small dataset to huggingface [link](https://huggingface.co/datasets/jitx/distillation_code_100) which could be used in the next step for demo purpose. 
 ```
 python3 data_generation.py --model bigcode/santacoder --dataset bigcode/the-stack --seq_length 1024 --split train --data_subset_path data/moonscript --run 46 --push_to_hub --save_local --nosample 100
 ``` 
 3. Distiilation
 ```
-python3 distill_step_by_step.py --dataset jitx/distillation_code_4 --subsample 1 --alpha 0.2 --max_steps 10 --eval_steps 1 --batch_size 1 --from_pretrained google/flan-t5-small --model_type task_prefix
+python3 distill_step_by_step.py --dataset jitx/distillation_code_100 --subsample 1 --alpha 0.2 --max_steps 10 --eval_steps 1 --batch_size 1 --from_pretrained google/flan-t5-small --model_type task_prefix --output_rationale
 ```
 
 ## Issues
