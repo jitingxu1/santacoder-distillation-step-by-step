@@ -164,6 +164,7 @@ def run(args):
 
     #### Prepare datasets Prepare data for training
     tokenizer = AutoTokenizer.from_pretrained(args.from_pretrained)
+    addtional_tokens = tokenizer.special_tokens_map['additional_special_tokens']
     addtional_tokens.extend([FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX])
     tokenizer.add_special_tokens({
         "additional_special_tokens": addtional_tokens,
