@@ -1,12 +1,18 @@
 import argparse
 import random
 import numpy as np
+import torch
 
+from dotenv import load_dotenv
 from datasets import Dataset, load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from tqdm import tqdm
+import openai
 
 from model import code_generation
+from rationale import openai_retinale
 
+load_dotenv()
 FIM_PREFIX = "<fim-prefix>"
 FIM_MIDDLE = "<fim-middle>"
 FIM_SUFFIX = "<fim-suffix>"
@@ -61,7 +67,6 @@ def permute(
     suffix = sample[boundaries[1] :]
     model_input = FIM_PREFIX+prefix+FIM_SUFFIX+suffix+FIM_MIDDLE+middle
     prompt = prefix + "<FILL-HERE>" + suffix
-    print("generating...")
     model_output = code_generation(model, tokenizer, prompt, 512, temperature=0.0001, seed=42)
 
     return prompt, model_input, middle, model_output
@@ -78,9 +83,14 @@ def create_dataset(model, tokenizer, dataset, np_rng, args):
     model_inputs = []
     middles = []
     model_outputs = []
+    openai_rationales = []
+    if args.nosample > 0:
+      exploded_rows = exploded_rows[:args.nosample]
 
-    for content in exploded_rows:
+    cnt = 0
+    for content in tqdm(exploded_rows):
         prompt, model_input, middle, model_output = permute(model, tokenizer, content, np_rng)
+        openai_rationales.append(openai_retinale(content))
         prompts.append(prompt)
         model_inputs.append(model_input)
         middles.append(middle)
@@ -93,6 +103,7 @@ def create_dataset(model, tokenizer, dataset, np_rng, args):
             "fim_inputs": model_inputs,
             "label_middles": middles,
             "santacoder_outputs": model_outputs,
+            "openai_rationales": openai_rationales,
 
         }
     )
@@ -108,7 +119,10 @@ if __name__ == "__main__":
     parser.add_argument('--split', type=str, default="train")
     parser.add_argument('--data_subset_path', type=str, required=False)
     parser.add_argument('--subsample', type=float, default=1.0)
+    parser.add_argument('--nosample', type=int, default=0)
     parser.add_argument('--run', type=int, default=46)
+    parser.add_argument('--push_to_hub', action='store_true')
+    parser.add_argument('--save_local', action='store_true')
     args = parser.parse_args()
   
 
@@ -119,6 +133,11 @@ if __name__ == "__main__":
         "additional_special_tokens": [EOD, FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX, FIM_PAD],
         "pad_token": EOD,
     })
+
+    if torch.cuda.is_available():
+      # Move model to GPU
+      model = model.to("cuda")
+  
 
     dataset = load_dataset(
         args.dataset,
@@ -131,7 +150,13 @@ if __name__ == "__main__":
         dataset = dataset.train_test_split(test_size=1.0-args.subsample, seed=args.run)['train']
 
     np_rng = np.random.RandomState(seed=args.run)
-    dataset = create_dataset(model, tokenizer_fim, dataset, np_rng, args)   
-    dataset.push_to_hub("jitx/distillation_code", use_auth_token=True)
+    dataset = create_dataset(model, tokenizer_fim, dataset, np_rng, args)
+
+    if args.save_local:
+      print("save to local disk")
+      dataset.save_to_disk(f"data_{args.nosample}.hf")
+    if args.push_to_hub:
+      print("pushing data to hub")
+      dataset.push_to_hub(f"jitx/distillation_code_{args.nosample}")
 
     # python3 data_generation.py --model bigcode/santacoder --dataset bigcode/the-stack --seq_length 1024 --split train --data_subset_path data/moonscript --subsample 0.0005 --run 46
