@@ -18,47 +18,21 @@ import os
 import shutil
 import logging
 
-import numpy as np
-
 from transformers import Seq2SeqTrainingArguments, Seq2SeqTrainer
 from transformers import T5ForConditionalGeneration
 from transformers import DataCollatorForSeq2Seq
-
-
-from datasets import DatasetDict, concatenate_datasets, load_dataset
+from datasets import load_dataset
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 
 from model_utils import TaskPrefixTrainer, TaskPrefixDataCollator
-# from model import FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX, EOD, FIM_PAD, code_generation
+from model import FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX
+from metrics import compute_metrics_text
 
-FIM_PREFIX = "<fim-prefix>"
-FIM_MIDDLE = "<fim-middle>"
-FIM_SUFFIX = "<fim-suffix>"
 
-def compute_metrics_text(tokenizer):
-    def compute_metrics(eval_pred):
-        predictions, labels = eval_pred
-        predictions[0] = np.where(
-          predictions[0] != -100,
-          predictions[0],
-          tokenizer.pad_token_id
-        )
-        # 2 spaces was replaced by \t
-        decoded_preds = tokenizer.batch_decode(
-            predictions[0],
-            max_length=512,
-            skip_special_tokens=True
-        )
+os.environ["WANDB_PROJECT"] = "Tabby"
+os.environ["WANDB_WATCH"]="all"
 
-        labels = np.where(labels[0] != -100, labels[0], tokenizer.pad_token_id)
-        decoded_labels = tokenizer.batch_decode(
-            labels, skip_special_tokens=True)
 
-        acc = np.mean(np.array(decoded_preds) == np.array(decoded_labels))
-
-        return {'accuracy': acc}
-
-    return compute_metrics
 
 def get_config_dir(args):
     return f'{args.dataset}/{args.from_pretrained.split("/")[1]}'
@@ -71,8 +45,8 @@ def train_and_evaluate(args, run, tokenizer, tokenized_datasets, compute_metrics
 
     model.resize_token_embeddings(len(tokenizer))
 
-    # if args.parallelize:
-    #     model.parallelize()
+    if args.parallelize:
+        model.parallelize()
     
     config_dir = get_config_dir(args)
     output_dir = f'ckpts/{config_dir}/{run}'  # for model ckpts
@@ -171,8 +145,6 @@ def run(args):
     })
 
     def tokenize_function(examples):
-        # TODO: handle space and tab in code
-
         model_inputs = tokenizer(
           [
             text.replace("  ", "\t") # space issue in T5Tokenizer
@@ -223,7 +195,7 @@ if __name__ == '__main__':
     parser.add_argument('--subsample', type=float, default=1.0)
     parser.add_argument('--alpha', type=float, default=0.5)
     parser.add_argument('--warmup_steps', type=int, default=8)
-    parser.add_argument('--max_steps', type=int, default=10000)
+    parser.add_argument('--max_steps', type=int, default=100)
     parser.add_argument('--eval_steps', type=int, default=250)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--optimizer_name', type=str, default='AdamW')
@@ -237,10 +209,10 @@ if __name__ == '__main__':
     parser.add_argument('--grad_steps', type=int, default=2)
     parser.add_argument('--local_rank', type=int, default=-1)
     parser.add_argument('--gen_max_len', type=int, default=512)
-    parser.add_argument('--parallelize', action='store_false')
+    parser.add_argument('--parallelize', action='store_true')
     parser.add_argument('--model_type', type=str, default='task_prefix')
     parser.add_argument('--bf16', action='store_true')
-    parser.add_argument('--wandb_run_name', type=str, default='wandb_project')
+    parser.add_argument('--wandb_run_name', type=str, default='santacoder-distillation')
     parser.add_argument('--wandb_watch', type=str, default='gradients')
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--output_rationale', action='store_true')
