@@ -40,6 +40,7 @@ EOD = "<|endoftext|>"
 def compute_metrics_text(tokenizer):
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
+        print(type(predictions[0]), predictions[0])
         decoded_preds = tokenizer.batch_decode(
             predictions[0],
             max_length=512,
@@ -57,7 +58,7 @@ def compute_metrics_text(tokenizer):
     return compute_metrics
 
 def get_config_dir(args):
-    return f'{args.dataset}/{args.from_pretrained.split("/")[1]}/{args.model_type}/{args.llm}/{args.subsample}/{args.label_type}/{args.alpha}/{args.max_input_length}/{args.grad_steps*args.batch_size}/{args.optimizer_name}/{args.lr}'
+    return f'{args.dataset}/{args.from_pretrained.split("/")[1]}'
 
 
 def train_and_evaluate(args, run, tokenizer, tokenized_datasets, compute_metrics):
@@ -149,6 +150,7 @@ def run(args):
     datasets = load_dataset(args.dataset, split="train")
     col_names = datasets.column_names
     datasets = datasets.rename_column('santacoder_outputs', "label")
+    datasets = datasets.rename_column('openai_rationales', "rationale")
     datasets = datasets.rename_column('fim_inputs', "input")
     datasets = datasets.add_column('rationale', datasets["input"])
     datasets = datasets.remove_columns(['santacoder_prompts', 'label_middles'])
@@ -172,8 +174,26 @@ def run(args):
 
     def tokenize_function(examples):
         # TODO: handle space and tab in code
-        model_inputs = tokenizer([text for text in examples['input']], max_length=args.max_input_length, truncation=True, padding=True,)
-        expl_model_inputs = tokenizer([text for text in examples['input']], max_length=args.max_input_length, truncation=True, padding=True,)
+
+        model_inputs = tokenizer(
+          [
+            text.replace("  ", "\t") # space issue in T5Tokenizer
+            for text in examples['input']
+          ],
+          max_length=args.max_input_length,
+          truncation=True,
+          padding=True,
+        )
+        prompt = "Explain the below moonscript code within 50 words:"
+        expl_model_inputs = tokenizer(
+          [
+            prompt + "\n" + text.replace("  ", "\t")
+            for text in examples['input']
+          ],
+          max_length=args.max_input_length,
+          truncation=True,
+          padding=True,
+        )
         model_inputs['expl_input_ids'] = expl_model_inputs['input_ids']
         model_inputs['expl_attention_mask'] = expl_model_inputs['attention_mask']
 

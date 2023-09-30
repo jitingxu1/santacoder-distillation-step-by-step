@@ -11,7 +11,7 @@ EOD = "<|endoftext|>"
 def fim_generation(model, tokenizer,prompt, max_new_tokens, temperature):
     prefix = prompt.split("<FILL-HERE>")[0]
     suffix = prompt.split("<FILL-HERE>")[1]
-    middle = infill(model, tokenizer, (prefix, suffix), max_new_tokens, temperature)
+    [middle] = infill(model, tokenizer, (prefix, suffix), max_new_tokens, temperature)
     # return post_processing_fim(prefix, middle, suffix)
     return middle
 
@@ -28,6 +28,8 @@ def infill(model, tokenizer, prefix_suffix_tuples, max_new_tokens, temperature):
     prompts = [f"{FIM_PREFIX}{prefix}{FIM_SUFFIX}{suffix}{FIM_MIDDLE}" for prefix, suffix in prefix_suffix_tuples]
     # `return_token_type_ids=False` is essential, or we get nonsense output.
     inputs = tokenizer(prompts, return_tensors="pt", padding=True, return_token_type_ids=False)
+    if torch.cuda.is_available():
+      inputs.to('cuda')
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
