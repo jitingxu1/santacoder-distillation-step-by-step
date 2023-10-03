@@ -68,7 +68,7 @@ Reference:
 I will use **Distillation step by step** for the following reasons:
 
 - Model architecture agnoitic
-- Good performance: could performs better than the teacher model.
+- Good performance: could performs better than the finetune.
 - Less data
 
 ## 3. Raw Data
