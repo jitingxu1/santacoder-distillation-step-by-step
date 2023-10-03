@@ -1,42 +1,40 @@
 import numpy as np
 import wandb
+from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu, sentence_bleu
 
+# TODO: Need to find a good way to measure accuracy of codes. 
 def compute_metrics_text(tokenizer):
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
-        # Too many empty outputs from T5
-        no_empty_output = sum([1 for p in predictions if len(p) < 5 ])
+
+        predictions = np.where(predictions[0] != -100, predictions[0], tokenizer.pad_token_id)
+        decoded_preds = tokenizer.batch_decode(
+                predictions,
+                skip_special_tokens=True
+        )
+        labels = np.where(labels[0] != -100, labels[0], tokenizer.pad_token_id)
+        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+        table_data = []
+        ref_bleu = []
+        gen_bleu = []
+       
+        for l, r in zip(decoded_preds, decoded_labels):
+            gen_bleu.append(l.split())
+            ref_bleu.append([r.split()])
+            table_data.append([l, r])
+
+        cc = SmoothingFunction()
+        score_bleu = corpus_bleu(ref_bleu, gen_bleu, weights=(0, 1, 0, 0), smoothing_function=cc.method4)
+        table = wandb.Table(data=table_data, columns=["Predictions", "Labels"])
+
         wandb.log({
-            "num_empty_t5_output": no_empty_output,
+            "table": table,
             })
-        total_acc = 0.0
-        data = []
-        n = len(predictions)
-        for p, l in zip(predictions, labels):
-            p = np.where(
-                p != -100,
-                p,
-                tokenizer.pad_token_id
-            )
-            decoded_preds = tokenizer.batch_decode(
-                p,
-                max_length=512,
-                skip_special_tokens=True
-            )
-            l = np.where(l != -100, l, tokenizer.pad_token_id)
-            decoded_labels = tokenizer.batch_decode(
-                l,
-                skip_special_tokens=True
-            )
-            acc = np.mean(np.array(decoded_preds) == np.array(decoded_labels))
-            total_acc += acc
-            data.append([decoded_preds, decoded_labels, acc])
+        
+        acc = np.mean(np.array(decoded_preds) == np.array(decoded_labels))
 
-        columns=["T5 output", "Santa coder output", "Accuracy"]
-        example_table = wandb.Table(data=data, columns=columns)
-        wandb.log({"Example": example_table})
-        # acc = np.mean(np.array(decoded_preds) == np.array(decoded_labels))
 
-        return {'accuracy': total_acc / n}
+        return {'accuracy': acc, "bleu": score_bleu}
 
     return compute_metrics
