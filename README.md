@@ -202,5 +202,6 @@ python3 distill_step_by_step.py --dataset jitx/distillation_code_100 --subsample
 ## Issues
 - T5Tokenizer does not handle space.
 - Need to find better metrics to measure the accuracy.
+	- [llm-code-eval](https://github.com/terryyz/llm-code-eval)
 - T5 generate empty response.
 - Not sure if the use of rationale for code completion model makes sense or not.
